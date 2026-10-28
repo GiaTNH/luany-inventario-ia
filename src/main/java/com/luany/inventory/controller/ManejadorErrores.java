@@ -28,4 +28,9 @@ public class ManejadorErrores {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(Map.of("error", "No se pudo completar: el registro ya existe o está en uso por otros datos"));
     }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, String>> servicioNoDisponible(IllegalStateException e) {
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(Map.of("error", e.getMessage()));
+    }
 }
