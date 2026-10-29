@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LUANY — Iniciar sesión</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+
+<div class="login-page">
+
+  <!-- Puntitos decorativos -->
+  <div class="login-dots" aria-hidden="true">
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span><span></span><span></span>
+    <span></span><span></span>
+  </div>
+
+  <div class="login-card">
+
+    <!-- Logo + título -->
+    <div class="login-logo">
+      <div class="logo-caja">
+        <span class="logo-nombre">Luany</span>
+        <span class="logo-estrella">✦ ✦ ✦</span>
+      </div>
+      <p class="login-bienvenida">Bienvenida de vuelta</p>
+      <p class="login-subtitulo">Ingresa a tu cuenta para continuar</p>
+    </div>
+
+    <!-- Pestañas — IDs usados por login.js -->
+    <div class="login-tabs">
+      <button class="login-tab activo" id="tab-login" onclick="cambiarTab('login')">Iniciar sesión</button>
+      <button class="login-tab" id="tab-registro" onclick="cambiarTab('registro')">Crear cuenta</button>
+    </div>
+
+    <!-- ===== FORMULARIO LOGIN — id="form-login" usado por login.js ===== -->
+    <form class="login-form activo" id="form-login" novalidate>
+
+      <div class="aviso-login">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="15" height="15" style="flex-shrink:0;">
+          <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+        </svg>
+        Sistema interno — solo personal autorizado
+      </div>
+
+      <div class="form-grupo">
+        <label for="login-email">Correo electrónico</label>
+        <input type="email" id="login-email" class="form-control"
+               placeholder="correo@luany.com" autocomplete="email" />
+        <span class="form-error" id="err-login-email">Ingresa un correo válido.</span>
+      </div>
+
+      <div class="form-grupo">
+        <label for="login-password">Contraseña</label>
+        <input type="password" id="login-password" class="form-control"
+               placeholder="••••••••" autocomplete="current-password" />
+        <span class="form-error" id="err-login-password">La contraseña es obligatoria.</span>
+      </div>
+
+      <!-- Olvidé contraseña — deshabilitado, sin lógica de backend -->
+      <div class="login-olvidaste-fila">
+        <a class="link-deshabilitado" title="Próximamente">
+          <svg viewBox="0 0 20 20" fill="currentColor" width="12" height="12">
+            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+          </svg>
+          ¿Olvidaste tu contraseña?
+        </a>
+      </div>
+
+      <!-- id="btn-login" usado por login.js -->
+      <button type="submit" class="btn btn-primario btn-login-full" id="btn-login">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="17" height="17">
+          <path fill-rule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clip-rule="evenodd"/>
+        </svg>
+        Iniciar sesión
+      </button>
+
+    </form>
+
+    <!-- ===== FORMULARIO REGISTRO — id="form-registro" usado por login.js ===== -->
+    <form class="login-form" id="form-registro" novalidate>
+
+      <div class="form-grupo">
+        <label for="reg-nombre">Nombre completo</label>
+        <input type="text" id="reg-nombre" class="form-control"
+               placeholder="Tu nombre" autocomplete="name" />
+        <span class="form-error" id="err-reg-nombre">El nombre es obligatorio.</span>
+      </div>
+
+      <div class="form-grupo">
+        <label for="reg-email">Correo electrónico</label>
+        <input type="email" id="reg-email" class="form-control"
+               placeholder="correo@luany.com" autocomplete="email" />
+        <span class="form-error" id="err-reg-email">Ingresa un correo válido.</span>
+      </div>
+
+      <div class="form-grupo">
+        <label for="reg-password">Contraseña</label>
+        <input type="password" id="reg-password" class="form-control"
+               placeholder="Mínimo 6 caracteres" autocomplete="new-password" />
+        <span class="form-error" id="err-reg-password">La contraseña debe tener al menos 6 caracteres.</span>
+      </div>
+
+      <!-- id="btn-registro" usado por login.js -->
+      <button type="submit" class="btn btn-primario btn-login-full" id="btn-registro">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="17" height="17">
+          <path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z"/>
+        </svg>
+        Crear cuenta
+      </button>
+
+    </form>
+
+    <!-- Pie de tarjeta -->
+    <p class="login-pie">Sistema interno — solo personal autorizado</p>
+
+  </div><!-- /login-card -->
+</div><!-- /login-page -->
+
+<div id="toast-container"></div>
+<script src="/js/api.js"></script>
+<script src="/js/login.js"></script>
+</body>
+</html>

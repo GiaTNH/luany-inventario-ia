@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LUANY — Productos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+
+<button class="btn-menu-movil" id="btn-menu-movil" aria-label="Menú">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>
+</button>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-caja">
+        <span class="logo-nombre">Luany</span>
+        <span class="logo-estrella">✦ ✦ ✦</span>
+      </div>
+      <span class="logo-panel">Panel de Inventario</span>
+      <span class="logo-slogan">Juega · Viste · Crece</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-seccion">Menú principal</div>
+      <a href="/dashboard.html" class="nav-item" data-pagina="dashboard.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Dashboard
+      </a>
+      <a href="/productos.html" class="nav-item" data-pagina="productos.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+        </svg>
+        Productos
+      </a>
+      <a href="/asistente.html" class="nav-item" data-pagina="asistente.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+          <line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="13" y2="14"/>
+        </svg>
+        Asistente IA
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="sidebar-usuario">
+        <div class="sidebar-avatar" id="avatar-inicial">U</div>
+        <div class="sidebar-usuario-info">
+          <span class="sidebar-usuario-nombre" id="nombre-usuario"></span>
+          <span class="sidebar-usuario-rol">Personal autorizado</span>
+        </div>
+      </div>
+      <button class="btn-cerrar-sesion">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+          <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Cerrar sesión
+      </button>
+    </div>
+  </aside>
+
+  <!-- CONTENIDO -->
+  <main class="contenido-principal">
+    <header class="topbar">
+      <div class="topbar-titulo">
+        <h2 id="titulo-pagina">Gestión de Productos</h2>
+        <p>Administra prendas, categorías y proveedores</p>
+      </div>
+    </header>
+
+    <div class="pagina">
+
+      <!-- Pestañas — .tab-btn y .tab-panel usados por productos.js -->
+      <div class="tabs">
+        <button class="tab-btn activo" onclick="cambiarTab('productos')">Productos</button>
+        <button class="tab-btn" onclick="cambiarTab('categorias')">Categorías</button>
+        <button class="tab-btn" onclick="cambiarTab('proveedores')">Proveedores</button>
+      </div>
+
+      <!-- TAB PRODUCTOS -->
+      <div class="tab-panel activo" id="tab-productos">
+        <div class="panel">
+
+          <!-- Barra de herramientas -->
+          <div class="toolbar-productos">
+            <div class="toolbar-filtros">
+              <!-- id="buscador" usado por productos.js -->
+              <div class="buscador-wrapper">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input type="text" id="buscador" class="form-control"
+                       placeholder="Buscar por nombre..." style="min-width:210px;" />
+              </div>
+              <!-- id="filtro-categoria" usado por productos.js -->
+              <select id="filtro-categoria" class="select-filtro">
+                <option value="">Todas las categorías</option>
+              </select>
+              <!-- id="filtro-estado" usado por productos.js -->
+              <select id="filtro-estado" class="select-filtro">
+                <option value="">Todos los estados</option>
+                <option value="AGOTADO">Agotado</option>
+                <option value="BAJO">Bajo</option>
+                <option value="NORMAL">Normal</option>
+                <option value="EXCESO">Exceso</option>
+              </select>
+            </div>
+            <div class="toolbar-acciones">
+              <button class="btn btn-primario" onclick="abrirModalProducto()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Nuevo producto
+              </button>
+            </div>
+          </div>
+
+          <!-- id="tabla-productos-body" usado por productos.js -->
+          <div class="tabla-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nombre</th>
+                  <th>Categoría</th>
+                  <th>Proveedor</th>
+                  <th>Stock actual</th>
+                  <th>Mín.</th>
+                  <th>Máx.</th>
+                  <th>Precio</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-productos-body">
+                <tr class="cargando-fila">
+                  <td colspan="9"><span class="spinner spinner-dark"></span> Cargando productos...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB CATEGORÍAS -->
+      <div class="tab-panel" id="tab-categorias">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Categorías</h3>
+            <button class="btn btn-primario" onclick="abrirModalCategoria()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Nueva categoría
+            </button>
+          </div>
+          <div class="tabla-wrapper">
+            <table>
+              <thead><tr><th>ID</th><th>Nombre</th><th>Acciones</th></tr></thead>
+              <tbody id="tabla-categorias-body">
+                <tr class="cargando-fila"><td colspan="3"><span class="spinner spinner-dark"></span> Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB PROVEEDORES -->
+      <div class="tab-panel" id="tab-proveedores">
+        <div class="panel">
+          <div class="panel-header">
+            <h3>Proveedores</h3>
+            <button class="btn btn-primario" onclick="abrirModalProveedor()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              Nuevo proveedor
+            </button>
+          </div>
+          <div class="tabla-wrapper">
+            <table>
+              <thead><tr><th>ID</th><th>Nombre</th><th>Teléfono</th><th>Acciones</th></tr></thead>
+              <tbody id="tabla-proveedores-body">
+                <tr class="cargando-fila"><td colspan="4"><span class="spinner spinner-dark"></span> Cargando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /pagina -->
+  </main>
+</div>
+
+<!-- ===== MODAL PRODUCTO — id="modal-producto" ===== -->
+<div class="modal-overlay" id="modal-producto">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-producto-titulo">Nuevo producto</h3>
+      <button class="btn-cerrar-modal" onclick="cerrarModal('modal-producto')" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="form-producto" novalidate>
+        <input type="hidden" id="prod-id" />
+        <div class="form-grupo">
+          <label for="prod-nombre">Nombre *</label>
+          <input type="text" id="prod-nombre" class="form-control" maxlength="120" placeholder="Ej. Body manga larga" />
+          <span class="form-error" id="err-prod-nombre">El nombre es obligatorio.</span>
+        </div>
+        <div class="form-fila">
+          <div class="form-grupo">
+            <label for="prod-categoria">Categoría *</label>
+            <select id="prod-categoria" class="form-control"><option value="">Seleccionar...</option></select>
+            <span class="form-error" id="err-prod-categoria">Selecciona una categoría.</span>
+          </div>
+          <div class="form-grupo">
+            <label for="prod-proveedor">Proveedor *</label>
+            <select id="prod-proveedor" class="form-control"><option value="">Seleccionar...</option></select>
+            <span class="form-error" id="err-prod-proveedor">Selecciona un proveedor.</span>
+          </div>
+        </div>
+        <div class="form-fila">
+          <div class="form-grupo">
+            <label for="prod-stock-actual">Stock actual *</label>
+            <input type="number" id="prod-stock-actual" class="form-control" min="0" placeholder="0" />
+            <span class="form-error" id="err-prod-stock-actual">Valor inválido.</span>
+          </div>
+          <div class="form-grupo">
+            <label for="prod-precio">Precio (S/) *</label>
+            <input type="number" id="prod-precio" class="form-control" min="0" step="0.01" placeholder="0.00" />
+            <span class="form-error" id="err-prod-precio">Precio inválido.</span>
+          </div>
+        </div>
+        <div class="form-fila">
+          <div class="form-grupo">
+            <label for="prod-stock-min">Stock mínimo *</label>
+            <input type="number" id="prod-stock-min" class="form-control" min="0" placeholder="0" />
+            <span class="form-error" id="err-prod-stock-min">Valor inválido.</span>
+          </div>
+          <div class="form-grupo">
+            <label for="prod-stock-max">Stock máximo *</label>
+            <input type="number" id="prod-stock-max" class="form-control" min="0" placeholder="0" />
+            <span class="form-error" id="err-prod-stock-max">Debe ser ≥ al mínimo.</span>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primario" id="btn-guardar-producto" onclick="guardarProducto()">Guardar producto</button>
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-producto')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL MOVIMIENTO — id="modal-movimiento" ===== -->
+<div class="modal-overlay" id="modal-movimiento">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-header">
+      <h3 id="modal-mov-titulo">Registrar movimiento</h3>
+      <button class="btn-cerrar-modal" onclick="cerrarModal('modal-movimiento')" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <form id="form-movimiento" novalidate>
+        <input type="hidden" id="mov-producto-id" />
+        <div class="form-grupo">
+          <label>Producto</label>
+          <input type="text" id="mov-producto-nombre" class="form-control" readonly
+                 style="background:#F5F0FF;color:var(--primario);font-weight:600;" />
+        </div>
+        <div class="form-grupo" id="grupo-tipo-mov">
+          <label for="mov-tipo">Tipo de movimiento *</label>
+          <select id="mov-tipo" class="form-control">
+            <option value="ENTRADA">Entrada</option>
+            <option value="SALIDA">Salida</option>
+            <option value="VENTA">Venta</option>
+          </select>
+        </div>
+        <div class="form-grupo">
+          <label for="mov-cantidad">Cantidad *</label>
+          <input type="number" id="mov-cantidad" class="form-control" min="1" placeholder="1" />
+          <span class="form-error" id="err-mov-cantidad">La cantidad debe ser al menos 1.</span>
+        </div>
+        <div class="form-grupo">
+          <label for="mov-observacion">Motivo / Observación</label>
+          <input type="text" id="mov-observacion" class="form-control" maxlength="200" placeholder="Opcional" />
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primario" id="btn-guardar-mov" onclick="guardarMovimiento()">Registrar movimiento</button>
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-movimiento')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL HISTORIAL — id="modal-historial" ===== -->
+<div class="modal-overlay" id="modal-historial">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <h3 id="modal-historial-titulo">Historial de movimientos</h3>
+      <button class="btn-cerrar-modal" onclick="cerrarModal('modal-historial')" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div class="tabla-wrapper">
+        <table>
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Cantidad</th><th>Observación</th></tr></thead>
+          <tbody id="tabla-historial-body">
+            <tr class="cargando-fila"><td colspan="4">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-historial')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL CATEGORÍA — id="modal-categoria" ===== -->
+<div class="modal-overlay" id="modal-categoria">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <h3 id="modal-cat-titulo">Nueva categoría</h3>
+      <button class="btn-cerrar-modal" onclick="cerrarModal('modal-categoria')" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="cat-id" />
+      <div class="form-grupo">
+        <label for="cat-nombre">Nombre *</label>
+        <input type="text" id="cat-nombre" class="form-control" maxlength="80" placeholder="Ej. Bodies" />
+        <span class="form-error" id="err-cat-nombre">El nombre es obligatorio.</span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primario" onclick="guardarCategoria()">Guardar categoría</button>
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-categoria')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL PROVEEDOR — id="modal-proveedor" ===== -->
+<div class="modal-overlay" id="modal-proveedor">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <h3 id="modal-prov-titulo">Nuevo proveedor</h3>
+      <button class="btn-cerrar-modal" onclick="cerrarModal('modal-proveedor')" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="prov-id" />
+      <div class="form-grupo">
+        <label for="prov-nombre">Nombre *</label>
+        <input type="text" id="prov-nombre" class="form-control" maxlength="120" placeholder="Nombre del proveedor" />
+        <span class="form-error" id="err-prov-nombre">El nombre es obligatorio.</span>
+      </div>
+      <div class="form-grupo">
+        <label for="prov-telefono">Teléfono</label>
+        <input type="text" id="prov-telefono" class="form-control" maxlength="20" placeholder="Opcional" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primario" onclick="guardarProveedor()">Guardar proveedor</button>
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-proveedor')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL CONFIRMAR ELIMINAR — id="modal-confirmar" ===== -->
+<div class="modal-overlay" id="modal-confirmar">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header">
+      <h3>¿Eliminar elemento?</h3>
+      <button class="btn-cerrar-modal" onclick="cerrarModal('modal-confirmar')" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:14px;align-items:flex-start;">
+        <div style="width:44px;height:44px;background:#FEE2E2;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" width="22" height="22">
+            <polyline points="3 6 5 6 21 6"/>
+            <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+            <path d="M10 11v6M14 11v6"/>
+          </svg>
+        </div>
+        <div>
+          <p id="confirmar-mensaje" style="font-size:14px;color:var(--texto);line-height:1.5;">
+            ¿Estás seguro de que deseas eliminar este elemento?
+          </p>
+          <p style="font-size:12px;color:var(--texto-suave);margin-top:6px;">Esta acción no se puede deshacer.</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-peligro" id="btn-confirmar-ok">Sí, eliminar</button>
+      <button class="btn btn-secundario" onclick="cerrarModal('modal-confirmar')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+<script src="/js/api.js"></script>
+<script src="/js/productos.js"></script>
+</body>
+</html>

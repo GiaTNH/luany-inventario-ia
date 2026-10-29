@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LUANY — Asistente IA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/styles.css" />
+</head>
+<body>
+
+<button class="btn-menu-movil" id="btn-menu-movil" aria-label="Menú">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>
+</button>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-caja">
+        <span class="logo-nombre">Luany</span>
+        <span class="logo-estrella">✦ ✦ ✦</span>
+      </div>
+      <span class="logo-panel">Panel de Inventario</span>
+      <span class="logo-slogan">Juega · Viste · Crece</span>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-seccion">Menú principal</div>
+      <a href="/dashboard.html" class="nav-item" data-pagina="dashboard.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        Dashboard
+      </a>
+      <a href="/productos.html" class="nav-item" data-pagina="productos.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
+        </svg>
+        Productos
+      </a>
+      <a href="/asistente.html" class="nav-item" data-pagina="asistente.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+          <line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="14" x2="13" y2="14"/>
+        </svg>
+        Asistente IA
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <!-- id="avatar-inicial" e id="nombre-usuario" usados por api.js -->
+      <div class="sidebar-usuario">
+        <div class="sidebar-avatar" id="avatar-inicial">U</div>
+        <div class="sidebar-usuario-info">
+          <span class="sidebar-usuario-nombre" id="nombre-usuario"></span>
+          <span class="sidebar-usuario-rol">Personal autorizado</span>
+        </div>
+      </div>
+      <!-- .btn-cerrar-sesion usado por api.js -->
+      <button class="btn-cerrar-sesion">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+          <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Cerrar sesión
+      </button>
+    </div>
+  </aside>
+
+  <!-- CONTENIDO -->
+  <main class="contenido-principal">
+    <header class="topbar">
+      <div class="topbar-titulo">
+        <!-- id="titulo-pagina" usado por api.js -->
+        <h2 id="titulo-pagina">Asistente de Inventario IA</h2>
+        <p>Consulta, analiza y obtén recomendaciones de reposición en tiempo real</p>
+      </div>
+    </header>
+
+    <div class="pagina" style="display:flex;flex-direction:column;height:calc(100vh - 73px);padding-bottom:20px;">
+
+      <!-- Preguntas rápidas — .pregunta-rapida y enviarPreguntaRapida usados por asistente.js -->
+      <div class="preguntas-rapidas">
+        <button class="pregunta-rapida" onclick="enviarPreguntaRapida(this)">¿Qué productos tienen stock bajo?</button>
+        <button class="pregunta-rapida" onclick="enviarPreguntaRapida(this)">¿Qué productos están agotados?</button>
+        <button class="pregunta-rapida" onclick="enviarPreguntaRapida(this)">¿Qué productos debo reponer y cuántas unidades?</button>
+        <button class="pregunta-rapida" onclick="enviarPreguntaRapida(this)">¿A qué proveedor debo contactar?</button>
+        <button class="pregunta-rapida" onclick="enviarPreguntaRapida(this)">¿Cuáles son los productos con mayor rotación?</button>
+        <button class="pregunta-rapida" onclick="enviarPreguntaRapida(this)">¿Hay algún producto con exceso de stock?</button>
+      </div>
+
+      <!-- Tarjeta blanca del chat -->
+      <div class="chat-contenedor" style="flex:1;">
+        <div class="chat-card">
+
+          <!-- id="chat-mensajes" usado por asistente.js para appendChild -->
+          <div class="chat-mensajes" id="chat-mensajes">
+
+            <!-- Píldora "Conversación iniciada" -->
+            <div class="chat-inicio-pill">
+              <span>✦ Conversación iniciada</span>
+            </div>
+
+            <!-- Mensaje de bienvenida estático.
+                 El JS genera .burbuja-wrapper + .burbuja con className directamente,
+                 por eso el wrapper estático usa las mismas clases que el JS espera. -->
+            <div class="burbuja-wrapper asistente">
+              <div class="burbuja asistente">¡Hola! Soy el asistente de inventario de LUANY. Puedo ayudarte a consultar el estado del stock, alertas, productos a reponer y más. ¿En qué te puedo ayudar?</div>
+            </div>
+
+          </div><!-- /chat-mensajes -->
+
+          <!-- Área de entrada -->
+          <div class="chat-input-area">
+            <div class="chat-input-fila">
+              <!-- id="chat-input" usado por asistente.js -->
+              <textarea
+                id="chat-input"
+                placeholder="Pregúntale al asistente sobre tu inventario..."
+                rows="2"
+                maxlength="500"
+              ></textarea>
+              <!-- id="btn-enviar" usado por asistente.js -->
+              <button class="btn-enviar-circular" id="btn-enviar" onclick="enviarMensaje()" aria-label="Enviar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <line x1="22" y1="2" x2="11" y2="13"/>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+              </button>
+            </div>
+            <!-- id="chat-contador" usado por asistente.js -->
+            <div class="chat-contador" id="chat-contador">0 / 500</div>
+          </div>
+
+        </div><!-- /chat-card -->
+      </div><!-- /chat-contenedor -->
+
+    </div><!-- /pagina -->
+  </main>
+</div>
+
+<div id="toast-container"></div>
+<script src="/js/api.js"></script>
+<script src="/js/asistente.js"></script>
+</body>
+</html>
