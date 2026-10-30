@@ -181,6 +181,7 @@ function iniciarLayout(tituloPagina) {
 
   const nombreEl = document.getElementById('nombre-usuario');
   if (nombreEl) nombreEl.textContent = usuario.nombre;
+  const saludoEl = document.getElementById('nombre-asistente'); if (saludoEl) saludoEl.textContent = usuario.nombre.split(/\s+/)[0];
 
   // Botón cerrar sesión
   document.querySelectorAll('.btn-cerrar-sesion').forEach(btn => {
