@@ -6,6 +6,7 @@ iniciarLayout('Productos');
 let todosProductos  = [];
 let todasCategorias = [];
 let todosProveedores = [];
+let ordenProductos = { campo: null, direccion: 1 };
 
 // ---------- PESTAÑAS ----------
 
@@ -16,6 +17,15 @@ function cambiarTab(nombre) {
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('activo'));
   document.getElementById(`tab-${nombre}`).classList.add('activo');
+
+  document.body.dataset.tabActiva = nombre;
+  document.querySelectorAll('.productos-nav-tab').forEach(enlace => {
+    enlace.classList.toggle('activo', enlace.dataset.productTab === nombre);
+  });
+  const enlaceProductos = document.querySelector('.productos-nav-main');
+  if (enlaceProductos) enlaceProductos.classList.toggle('activo', nombre === 'productos');
+  if (nombre === 'productos') history.replaceState(null, '', `${location.pathname}${location.search}`);
+  else history.replaceState(null, '', `#${nombre}`);
 
   if (nombre === 'categorias')  cargarCategorias();
   if (nombre === 'proveedores') cargarProveedores();
@@ -36,6 +46,14 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', e => {
     if (e.target === overlay) overlay.classList.remove('visible');
   });
+});
+
+document.addEventListener('click', evento => {
+  if (evento.target.closest('.productos-entry-menu-popover') || !evento.target.closest('.productos-entry-menu')) cerrarMenuEntradaSalida();
+});
+
+document.addEventListener('keydown', evento => {
+  if (evento.key === 'Escape') cerrarMenuEntradaSalida();
 });
 
 // ---------- UTILIDADES FORMULARIO ----------
@@ -78,42 +96,157 @@ function poblarFiltroCategoria() {
 function renderTablaProductos(lista) {
   const tbody = document.getElementById('tabla-productos-body');
   if (!lista.length) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="estado-vacio"><p>No se encontraron productos.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9"><div class="productos-empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4M8 11h6"/></svg><p>No se encontraron productos con estos filtros.</p></div></td></tr>`;
     return;
   }
+
   tbody.innerHTML = lista.map(p => {
     const estado = calcularEstado(p.stockActual, p.stockMinimo, p.stockMaximo);
-    return `<tr>
-      <td>${escapar(p.nombre)}</td>
-      <td>${escapar(p.categoria?.nombre || '—')}</td>
-      <td>${escapar(p.proveedor?.nombre || '—')}</td>
-      <td><strong>${p.stockActual}</strong></td>
-      <td>${p.stockMinimo}</td>
-      <td>${p.stockMaximo}</td>
+    const nombre = escapar(p.nombre);
+    const categoriaClase = claseCategoria(p.categoria);
+    const iconoCategoria = iconoCategoriaSvg(p.categoria);
+    const iconoPrenda = iconoPrendaSvg(p.nombre);
+    return `<tr class="productos-card-row">
+      <td><div class="producto-table-name">
+        <span class="producto-table-thumb">
+          <span class="producto-thumb-fallback" aria-hidden="true">${iconoPrenda}</span>
+          <img src="/img/productos/${encodeURIComponent(p.id)}.png" alt="" loading="lazy" onerror="this.hidden=true" />
+        </span>
+        <span class="producto-table-copy"><strong>${nombre}</strong></span>
+      </div></td>
+      <td><span class="producto-category-tag ${categoriaClase}">${iconoCategoria}${escapar(p.categoria?.nombre || '—')}</span></td>
+      <td><span class="producto-provider-name">${escapar(p.proveedor?.nombre || '—')}</span></td>
+      <td class="producto-stock-current"><strong>${Number(p.stockActual) || 0}</strong></td>
+      <td class="producto-stock-muted">${Number(p.stockMinimo) || 0}</td>
+      <td class="producto-stock-muted">${Number(p.stockMaximo) || 0}</td>
       <td>S/ ${Number(p.precio).toFixed(2)}</td>
-      <td>${badgeEstado(estado)}</td>
-      <td>
-        <div class="d-flex gap-8" style="flex-wrap:wrap;">
-          <button class="btn btn-icono btn-sm" title="Editar" onclick="abrirModalProducto(${p.id})">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      <td><span class="producto-status producto-status-${estado.toLowerCase()}"><i></i>${estado}</span></td>
+      <td><div class="productos-row-actions">
+        <button type="button" class="productos-action-button productos-row-history" title="Ver movimientos" aria-label="Ver movimientos de ${nombre}" onclick="verHistorial(${p.id},'${nombre}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
+        </button>
+        <button type="button" class="productos-action-button productos-row-edit" title="Editar" aria-label="Editar ${nombre}" onclick="abrirModalProducto(${p.id})">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z"/></svg>
+        </button>
+        <div class="productos-entry-menu">
+          <button type="button" class="productos-action-button productos-row-entry" title="Registrar entrada o salida" aria-label="Registrar entrada o salida para ${nombre}" aria-expanded="false" onclick="toggleMenuEntradaSalida(this,event)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>
           </button>
-          <button class="btn btn-exito btn-sm" title="Entrada" onclick="abrirModalMovimiento(${p.id},'${escapar(p.nombre)}','ENTRADA')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
-          </button>
-          <button class="btn btn-naranja btn-sm" title="Salida/Venta" onclick="abrirModalMovimiento(${p.id},'${escapar(p.nombre)}','SALIDA')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-          </button>
-          <button class="btn btn-secundario btn-sm" title="Historial" onclick="verHistorial(${p.id},'${escapar(p.nombre)}')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          </button>
-          <button class="btn btn-peligro btn-sm" title="Eliminar" onclick="confirmarEliminarProducto(${p.id},'${escapar(p.nombre)}')">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
-          </button>
+          <div class="productos-entry-menu-popover" role="menu">
+            <button type="button" role="menuitem" title="Registrar entrada" aria-label="Registrar entrada para ${nombre}" onclick="abrirModalMovimiento(${p.id},'${nombre}','ENTRADA')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15v4h16v-4M12 3v12m-5-5 5 5 5-5"/></svg>Registrar entrada</button>
+            <button type="button" role="menuitem" title="Registrar salida" aria-label="Registrar salida para ${nombre}" onclick="abrirModalMovimiento(${p.id},'${nombre}','SALIDA')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>Registrar salida</button>
+          </div>
         </div>
-      </td>
+        <button type="button" class="productos-action-button productos-row-delete" title="Eliminar" aria-label="Eliminar ${nombre}" onclick="confirmarEliminarProducto(${p.id},'${nombre}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg>
+        </button>
+      </div></td>
     </tr>`;
   }).join('');
 }
+
+function ordenarProductos(campo) {
+  if (ordenProductos.campo === campo) ordenProductos.direccion *= -1;
+  else ordenProductos = { campo, direccion: 1 };
+  actualizarIndicadorOrden();
+  aplicarFiltros();
+}
+
+function actualizarIndicadorOrden() {
+  document.querySelectorAll('.productos-sort-button').forEach(boton => {
+    const activo = boton.dataset.sort === ordenProductos.campo;
+    boton.classList.toggle('orden-activo', activo);
+    boton.setAttribute('aria-sort', activo ? (ordenProductos.direccion === 1 ? 'ascending' : 'descending') : 'none');
+    const icono = boton.querySelector('svg');
+    if (icono) icono.classList.toggle('orden-descendente', activo && ordenProductos.direccion === -1);
+  });
+}
+
+function aplicarOrdenProductos(lista) {
+  if (!ordenProductos.campo) return lista;
+  const gravedad = { AGOTADO: 0, BAJO: 1, NORMAL: 2, EXCESO: 3 };
+  const valor = (producto) => {
+    switch (ordenProductos.campo) {
+      case 'nombre': return producto.nombre || '';
+      case 'categoria': return producto.categoria?.nombre || '';
+      case 'proveedor': return producto.proveedor?.nombre || '';
+      case 'stockActual': return Number(producto.stockActual) || 0;
+      case 'stockMinimo': return Number(producto.stockMinimo) || 0;
+      case 'stockMaximo': return Number(producto.stockMaximo) || 0;
+      case 'precio': return Number(producto.precio) || 0;
+      case 'estado': return gravedad[calcularEstado(producto.stockActual, producto.stockMinimo, producto.stockMaximo)];
+      default: return '';
+    }
+  };
+  return [...lista].sort((a, b) => {
+    const primero = valor(a);
+    const segundo = valor(b);
+    const comparacion = typeof primero === 'number'
+      ? primero - segundo
+      : String(primero).localeCompare(String(segundo), 'es', { sensitivity: 'base' });
+    return comparacion * ordenProductos.direccion;
+  });
+}
+
+function toggleMenuEntradaSalida(boton, evento) {
+  evento.stopPropagation();
+  const menu = boton.closest('.productos-entry-menu');
+  const abrir = !menu.classList.contains('abierto');
+  cerrarMenuEntradaSalida();
+  if (abrir) {
+    menu.classList.add('abierto');
+    boton.setAttribute('aria-expanded', 'true');
+  }
+}
+
+function cerrarMenuEntradaSalida() {
+  document.querySelectorAll('.productos-entry-menu.abierto').forEach(menu => {
+    menu.classList.remove('abierto');
+    menu.querySelector('.productos-row-entry')?.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function claseCategoria(categoria) {
+  const nombre = (categoria?.nombre || '').toLocaleLowerCase('es-PE').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (nombre.includes('bebe nina')) return 'category-color-baby-girl';
+  if (nombre.includes('bebe nino')) return 'category-color-baby-boy';
+  if (nombre.includes('unisex')) return 'category-color-unisex';
+  if (nombre.includes('accesorio')) return 'category-color-accessories';
+  if (nombre.includes('nina')) return 'category-color-girl';
+  if (nombre.includes('nino')) return 'category-color-boy';
+  const paleta = ((Number(categoria?.id) || 1) - 1) % 6 + 1;
+  return `category-palette-${paleta}`;
+}
+
+function iconoCategoriaSvg(categoria) {
+  const nombre = (categoria?.nombre || '').toLocaleLowerCase('es-PE').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (nombre.includes('bebe')) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 9a5 5 0 0 1 10 0v1a7 7 0 0 1-14 0V9a2 2 0 0 1 4 0M17 9a2 2 0 0 1 4 0v1a7 7 0 0 1-2 5"/><circle cx="9" cy="12" r=".7" fill="currentColor"/><circle cx="15" cy="12" r=".7" fill="currentColor"/><path d="M10 15h4"/></svg>';
+  }
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13V6a2 2 0 0 0-2-2H7L3 8l8 8 4-4Z"/><circle cx="8" cy="8" r="1"/></svg>';
+}
+
+function iconoPrendaSvg(nombre) {
+  const texto = (nombre || '').toLocaleLowerCase('es-PE').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const iconos = [
+    ['body', 'M8 3 5 5l2 4-1 12h12L17 9l2-4-3-2-2 3h-4L8 3Z'],
+    ['mameluco', 'M8 3 5 5l2 4-1 5 2 2-1 5h10l-1-5 2-2-1-5 2-4-3-2-2 3h-4L8 3Z'],
+    ['pijama', 'M8 3 5 5l2 4-2 3 2 2-1 6h12l-1-6 2-2-2-3 2-4-3-2-2 3h-4L8 3Z'],
+    ['vestido', 'M9 3h6l1 4 3 3-2 11H7L5 10l3-3 1-4Z'],
+    ['polo', 'M8 3 5 5l2 4 2-1v12h6V6l2 1 2-4-3-2-2 3h-4L8 3Z'],
+    ['jean', 'M7 3h10l1 18h-5l-1-8-1 8H6L7 3Z'],
+    ['casaca', 'M8 3 5 5l2 4-1 12h5V11h2v8h5L17 7l2-2-3-2-2 3h-4L8 3Z'],
+    ['buzo', 'M8 3 5 5l2 4-1 12h5V11h2v8h5L17 7l2-2-3-2-2 3h-4L8 3Z'],
+    ['short', 'M7 3h10l1 10-4 1-2-4-2 4-4-1 1-10Z'],
+    ['gorro', 'M4 13a8 8 0 0 1 16 0v2H4v-2Zm-1 4h18v3H3z'],
+    ['manta', 'M4 4h16v16H4zM8 4v16m8-16v16M4 9h16m-16 6h16'],
+    ['medias', 'M7 3h5v10l3 2-1 5H5v-4l2-3V3Zm8 0h4v8l2 2-1 5h-6l1-4V3Z'],
+    ['babero', 'M8 4h8l2 4-2 2v10H8V10L6 8l2-4Zm4 4v4'],
+  ];
+  const trazo = iconos.find(([palabra]) => texto.includes(palabra))?.[1] || 'M8 3 5 5l2 4-1 12h12L17 9l2-4-3-2-2 3h-4L8 3Z';
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${trazo}"/></svg>`;
+}
+
 
 // ---------- FILTROS ----------
 
@@ -123,14 +256,16 @@ function aplicarFiltros() {
   const estadoF  = document.getElementById('filtro-estado').value;
 
   const filtrados = todosProductos.filter(p => {
-    const coincideNombre = p.nombre.toLowerCase().includes(texto);
+    const nombre = (p.nombre || '').toLocaleLowerCase('es-PE');
+    const categoria = (p.categoria?.nombre || '').toLocaleLowerCase('es-PE');
+    const coincideNombre = nombre.includes(texto);
     const coincideCat    = !catId || String(p.categoria?.id) === catId;
     const estado         = calcularEstado(p.stockActual, p.stockMinimo, p.stockMaximo);
     const coincideEstado = !estadoF || estado === estadoF;
     return coincideNombre && coincideCat && coincideEstado;
   });
 
-  renderTablaProductos(filtrados);
+  renderTablaProductos(aplicarOrdenProductos(filtrados));
 }
 
 document.getElementById('buscador').addEventListener('input', aplicarFiltros);
@@ -353,16 +488,16 @@ function renderTablaCategorias() {
     tbody.innerHTML = `<tr><td colspan="3"><div class="estado-vacio"><p>Sin categorías.</p></div></td></tr>`;
     return;
   }
-  tbody.innerHTML = todasCategorias.map(c => `<tr>
-    <td>${c.id}</td>
-    <td>${escapar(c.nombre)}</td>
+  tbody.innerHTML = todasCategorias.map(c => `<tr class="productos-card-row">
+    <td><span class="productos-entity-id">${c.id}</span></td>
+    <td><strong class="productos-entity-name">${escapar(c.nombre)}</strong></td>
     <td>
-      <div class="d-flex gap-8">
-        <button class="btn btn-icono btn-sm" onclick="abrirModalCategoria(${c.id},'${escapar(c.nombre)}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      <div class="productos-row-actions productos-entity-actions">
+        <button type="button" class="productos-action-button productos-row-edit" title="Editar categoría" aria-label="Editar categoría ${escapar(c.nombre)}" onclick="abrirModalCategoria(${c.id},'${escapar(c.nombre)}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z"/></svg>
         </button>
-        <button class="btn btn-peligro btn-sm" onclick="confirmarEliminarCat(${c.id},'${escapar(c.nombre)}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+        <button type="button" class="productos-action-button productos-row-delete" title="Eliminar categoría" aria-label="Eliminar categoría ${escapar(c.nombre)}" onclick="confirmarEliminarCat(${c.id},'${escapar(c.nombre)}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg>
         </button>
       </div>
     </td>
@@ -437,17 +572,17 @@ function renderTablaProveedores() {
     tbody.innerHTML = `<tr><td colspan="4"><div class="estado-vacio"><p>Sin proveedores.</p></div></td></tr>`;
     return;
   }
-  tbody.innerHTML = todosProveedores.map(p => `<tr>
-    <td>${p.id}</td>
-    <td>${escapar(p.nombre)}</td>
-    <td>${escapar(p.telefono || '—')}</td>
+  tbody.innerHTML = todosProveedores.map(p => `<tr class="productos-card-row">
+    <td><span class="productos-entity-id">${p.id}</span></td>
+    <td><strong class="productos-entity-name">${escapar(p.nombre)}</strong></td>
+    <td><span class="productos-entity-phone">${escapar(p.telefono || '—')}</span></td>
     <td>
-      <div class="d-flex gap-8">
-        <button class="btn btn-icono btn-sm" onclick="abrirModalProveedor(${p.id},'${escapar(p.nombre)}','${escapar(p.telefono||'')}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      <div class="productos-row-actions productos-entity-actions">
+        <button type="button" class="productos-action-button productos-row-edit" title="Editar proveedor" aria-label="Editar proveedor ${escapar(p.nombre)}" onclick="abrirModalProveedor(${p.id},'${escapar(p.nombre)}','${escapar(p.telefono||'')}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z"/></svg>
         </button>
-        <button class="btn btn-peligro btn-sm" onclick="confirmarEliminarProv(${p.id},'${escapar(p.nombre)}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+        <button type="button" class="productos-action-button productos-row-delete" title="Eliminar proveedor" aria-label="Eliminar proveedor ${escapar(p.nombre)}" onclick="confirmarEliminarProv(${p.id},'${escapar(p.nombre)}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg>
         </button>
       </div>
     </td>
@@ -506,4 +641,6 @@ async function eliminarProveedor(id) {
 }
 
 // ---------- INICIO ----------
+const tabInicial = location.hash.slice(1);
+if (tabInicial === 'categorias' || tabInicial === 'proveedores') cambiarTab(tabInicial);
 cargarTodo();
