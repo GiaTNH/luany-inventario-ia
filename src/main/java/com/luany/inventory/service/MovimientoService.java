@@ -2,44 +2,84 @@ package com.luany.inventory.service;
 
 import com.luany.inventory.model.*;
 import com.luany.inventory.repository.MovimientoRepository;
-import com.luany.inventory.repository.ProductoRepository;
+import com.luany.inventory.repository.UsuarioRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
+import java.time.Clock;
 
 @Service
 @RequiredArgsConstructor
 public class MovimientoService {
 
     private final MovimientoRepository movimientoRepository;
-    private final ProductoRepository productoRepository;
+    private final ProductoStockLockService productoStockLockService;
+    private final UsuarioRepository usuarioRepository;
+    private final Clock clock;
 
     @Transactional
     public Movimiento registrar(MovimientoRequest request) {
-        Producto producto = productoRepository.findById(request.getProductoId())
-                .orElseThrow(() -> new IllegalArgumentException("El producto no existe"));
+        return registrar(request, null);
+    }
 
+    @Transactional
+    public Movimiento registrar(MovimientoRequest request, String emailUsuario) {
+        if (request == null || request.getTipo() == null) {
+            throw new IllegalArgumentException("El tipo de movimiento es obligatorio");
+        }
+        if (request.getTipo() == TipoMovimiento.CREACION) {
+            throw new IllegalArgumentException("El tipo CREACION solo se registra al crear un producto");
+        }
+        if (request.getProductoId() == null) {
+            throw new IllegalArgumentException("El producto es obligatorio");
+        }
+        if (request.getCantidad() == null || request.getCantidad() <= 0) {
+            throw new IllegalArgumentException("La cantidad debe ser mayor a 0");
+        }
+        if (request.getObservacion() == null || request.getObservacion().isBlank()) {
+            throw new IllegalArgumentException("El motivo del movimiento es obligatorio");
+        }
+
+        Producto producto = productoStockLockService.bloquear(request.getProductoId());
         int cantidad = request.getCantidad();
-
+        int stockAnterior = producto.getStockActual();
         if (request.getTipo() == TipoMovimiento.ENTRADA) {
-            producto.setStockActual(producto.getStockActual() + cantidad);
-        } else {
-            if (producto.getStockActual() < cantidad) {
+            if (stockAnterior < 0 || cantidad > Integer.MAX_VALUE - stockAnterior) {
                 throw new IllegalArgumentException(
-                        "Stock insuficiente: hay " + producto.getStockActual()
+                        "La entrada supera el máximo permitido para el stock");
+            }
+            producto.setStockActual(stockAnterior + cantidad);
+        } else if (request.getTipo() == TipoMovimiento.SALIDA
+                || request.getTipo() == TipoMovimiento.VENTA) {
+            if (stockAnterior < cantidad) {
+                throw new IllegalArgumentException(
+                        "Stock insuficiente: hay " + stockAnterior
                                 + " unidades y se piden " + cantidad);
             }
             producto.setStockActual(producto.getStockActual() - cantidad);
+        } else {
+            throw new IllegalArgumentException("El tipo de movimiento no es válido");
         }
-        productoRepository.save(producto);
-
         Movimiento movimiento = new Movimiento();
         movimiento.setProducto(producto);
         movimiento.setTipo(request.getTipo());
         movimiento.setCantidad(cantidad);
+        movimiento.setFecha(LocalDateTime.now(clock));
         movimiento.setObservacion(request.getObservacion());
+        movimiento.setStockAnterior(stockAnterior);
+        movimiento.setStockNuevo(producto.getStockActual());
+        if (emailUsuario != null) {
+            usuarioRepository.buscarPorEmail(emailUsuario).ifPresent(movimiento::setUsuario);
+        }
         return movimientoRepository.save(movimiento);
     }
 
@@ -48,6 +88,45 @@ public class MovimientoService {
     }
 
     public List<Movimiento> listarTodos() {
-        return movimientoRepository.findAll();
+        return movimientoRepository.findAll(Sort.by(
+                Sort.Order.desc("fecha"),
+                Sort.Order.desc("id")));
+    }
+
+    public Map<Long, Long> ventasPorProducto(LocalDate desde, LocalDate hasta) {
+        Map<Long, Long> ventas = new HashMap<>();
+        List<Object[]> filas = movimientoRepository.ventasPorProducto(
+                TipoMovimiento.VENTA, desde.atStartOfDay(), hasta.plusDays(1).atStartOfDay());
+        for (Object[] fila : filas) {
+            ventas.put(((Number) fila[0]).longValue(), ((Number) fila[1]).longValue());
+        }
+        return ventas;
+    }
+
+    public Page<Movimiento> listarPaginado(
+            Long productoId,
+            TipoMovimiento tipo,
+            LocalDate desde,
+            LocalDate hasta,
+            int pagina,
+            int tamano) {
+        if (pagina < 0) {
+            throw new IllegalArgumentException("La página no puede ser negativa");
+        }
+        if (tamano < 1 || tamano > 100) {
+            throw new IllegalArgumentException("El tamaño de página debe estar entre 1 y 100");
+        }
+        if (desde != null && hasta != null && desde.isAfter(hasta)) {
+            throw new IllegalArgumentException("La fecha inicial no puede ser posterior a la fecha final");
+        }
+
+        LocalDateTime desdeInclusivo = desde == null ? null : desde.atStartOfDay();
+        LocalDateTime hastaExclusivo = hasta == null ? null : hasta.plusDays(1).atStartOfDay();
+        PageRequest solicitud = PageRequest.of(
+                pagina,
+                tamano,
+                Sort.by(Sort.Order.desc("fecha"), Sort.Order.desc("id")));
+        return movimientoRepository.buscarPaginado(
+                productoId, tipo, desdeInclusivo, hastaExclusivo, solicitud);
     }
 }

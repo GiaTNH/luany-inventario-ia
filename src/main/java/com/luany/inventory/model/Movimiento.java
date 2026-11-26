@@ -1,5 +1,7 @@
 package com.luany.inventory.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -25,8 +27,26 @@ public class Movimiento {
     private Integer cantidad;
 
     @Column(nullable = false)
-    private LocalDateTime fecha = LocalDateTime.now();
+    private LocalDateTime fecha;
 
     @Column(length = 200)
     private String observacion;
+
+    // Quien registro el movimiento (RNF-12). No se envia en el JSON porque
+    // la entidad Usuario contiene el hash de la contrasena.
+    @JsonIgnore
+    @ManyToOne
+    @JoinColumn(name = "usuario_id")
+    private Usuario usuario;
+
+    @Column(name = "stock_anterior")
+    private Integer stockAnterior;
+
+    @Column(name = "stock_nuevo")
+    private Integer stockNuevo;
+
+    @JsonProperty("usuarioNombre")
+    public String getUsuarioNombre() {
+        return usuario == null ? null : usuario.getNombre();
+    }
 }

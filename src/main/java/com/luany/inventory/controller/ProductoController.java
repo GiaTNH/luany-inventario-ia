@@ -1,11 +1,13 @@
 package com.luany.inventory.controller;
 
 import com.luany.inventory.model.Producto;
+import com.luany.inventory.model.ProductoActualizacionRequest;
 import com.luany.inventory.model.ProductoRequest;
 import com.luany.inventory.service.ProductoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
 
 import java.util.List;
 import java.util.Map;
@@ -38,13 +40,16 @@ public class ProductoController {
     }
 
     @PostMapping
-    public Producto crear(@Valid @RequestBody ProductoRequest request) {
-        return productoService.crear(request);
+    public Producto crear(@Valid @RequestBody ProductoRequest request, Authentication authentication) {
+        return productoService.crear(request, authentication.getName());
     }
 
     @PutMapping("/{id}")
-    public Producto actualizar(@PathVariable Long id, @Valid @RequestBody ProductoRequest request) {
-        return productoService.actualizar(id, request);
+    public Producto actualizar(
+            @PathVariable Long id,
+            @Valid @RequestBody ProductoActualizacionRequest request,
+            Authentication authentication) {
+        return productoService.actualizar(id, request, authentication.getName());
     }
 
     @DeleteMapping("/{id}")

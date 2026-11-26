@@ -2,8 +2,13 @@
 
 iniciarLayout('Dashboard');
 
-const intlFecha = new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'long', year: 'numeric' });
-const intlHora = new Intl.DateTimeFormat('es-PE', { hour: '2-digit', minute: '2-digit', hour12: false });
+const intlFecha = new Intl.DateTimeFormat('es-PE', {
+  timeZone: ZONA_HORARIA_LUANY, day: 'numeric', month: 'long', year: 'numeric',
+});
+const intlHora = new Intl.DateTimeFormat('es-PE', {
+  timeZone: ZONA_HORARIA_LUANY, hour: '2-digit', minute: '2-digit', hour12: false,
+});
+const intlDia = new Intl.DateTimeFormat('es-PE', { timeZone: ZONA_HORARIA_LUANY, weekday: 'short' });
 let movimientosDashboard = [];
 
 function capitalizar(texto) {
@@ -12,7 +17,7 @@ function capitalizar(texto) {
 
 function actualizarFechaHora() {
   const ahora = new Date();
-  const dia = capitalizar(ahora.toLocaleDateString('es-PE', { weekday: 'short' }).replace(/\.$/, ''));
+  const dia = capitalizar(intlDia.format(ahora).replace(/\.$/, ''));
   const fechaEl = document.getElementById('dashboard-date');
   const horaEl = document.getElementById('dashboard-time');
   if (fechaEl) {
@@ -22,11 +27,25 @@ function actualizarFechaHora() {
   if (horaEl) horaEl.textContent = `${dia} · ${intlHora.format(ahora)}`;
 }
 
+function notificarCambioPassword() {
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('passwordChanged') !== '1') return;
+
+  url.searchParams.delete('passwordChanged');
+  window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+  mostrarToast(
+    'Tu contraseña se actualizó correctamente. Recuerda utilizar tu nueva contraseña en tus próximos inicios de sesión.',
+    'exito',
+    7000,
+  );
+}
+
 function inicializarCabecera() {
   const usuario = obtenerSesion();
   const avatar = document.getElementById('dashboard-avatar-inicial');
   if (avatar && usuario?.nombre) avatar.textContent = usuario.nombre.trim().charAt(0).toLocaleUpperCase('es-PE');
 
+  notificarCambioPassword();
   actualizarFechaHora();
   window.setInterval(actualizarFechaHora, 60000);
 
@@ -35,12 +54,6 @@ function inicializarCabecera() {
       evento.preventDefault();
       document.getElementById('dashboard-product-search')?.focus();
     }
-  });
-
-  const alertasLink = document.getElementById('dashboard-alerts-link');
-  alertasLink?.addEventListener('click', (evento) => {
-    evento.preventDefault();
-    document.getElementById('dashboard-alertas')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
   document.getElementById('dashboard-period')?.addEventListener('change', (evento) => {
@@ -147,52 +160,33 @@ function renderResultadosBusqueda(productos, contenedor, abrir, cerrar) {
 
 /** Fecha de hoy en formato YYYY-MM-DD local */
 function hoyStr() {
-  const h = new Date();
-  return `${h.getFullYear()}-${String(h.getMonth()+1).padStart(2,'0')}-${String(h.getDate()).padStart(2,'0')}`;
+  return fechaIsoLuany();
 }
 
 /** Comprueba si una fecha (ISO string o arreglo) corresponde a hoy */
 function esHoy(fecha) {
-  if (!fecha) return false;
-  let d;
-  if (Array.isArray(fecha)) {
-    const [y, m, day] = fecha;
-    d = new Date(y, m - 1, day);
-  } else {
-    d = new Date(fecha);
-  }
-  const h = new Date();
-  return d.getFullYear() === h.getFullYear() &&
-         d.getMonth()    === h.getMonth()    &&
-         d.getDate()     === h.getDate();
+  const d = fechaComoDateLuany(fecha);
+  const h = fechaActualLuany();
+  return Boolean(d && h
+    && d.getUTCFullYear() === h.getUTCFullYear()
+    && d.getUTCMonth() === h.getUTCMonth()
+    && d.getUTCDate() === h.getUTCDate());
 }
 
 function fechaMovimiento(fecha) {
-  if (!fecha) return null;
-  if (Array.isArray(fecha)) {
-    const [year, month, day, hour = 0, minute = 0, second = 0] = fecha;
-    return new Date(year, month - 1, day, hour, minute, second);
-  }
-  const fechaParseada = new Date(fecha);
-  return Number.isNaN(fechaParseada.getTime()) ? null : fechaParseada;
+  return fechaComoDateLuany(fecha);
 }
 
 function claveDia(fecha) {
-  return `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
+  return fechaIsoLuany(fecha);
 }
 
 /** Comprueba si una fecha está dentro de los últimos N días */
 function enUltimosDias(fecha, dias) {
-  if (!fecha) return false;
-  let d;
-  if (Array.isArray(fecha)) {
-    const [y, m, day] = fecha;
-    d = new Date(y, m - 1, day);
-  } else {
-    d = new Date(fecha);
-  }
-  const limite = new Date();
-  limite.setDate(limite.getDate() - dias);
+  const d = fechaComoDateLuany(fecha);
+  const limite = fechaActualLuany();
+  if (!d || !limite) return false;
+  limite.setUTCDate(limite.getUTCDate() - dias);
   return d >= limite;
 }
 
@@ -228,18 +222,11 @@ async function cargarDashboard() {
 
   if (alertasResult.status === 'fulfilled') {
     const alertas = alertasResult.value;
-    const alertCount = document.getElementById('dashboard-alert-count');
-    const alertLink = document.getElementById('dashboard-alerts-link');
-    if (alertCount) {
-      alertCount.textContent = alertas.length;
-      alertCount.hidden = alertas.length === 0;
-    }
-    if (alertLink) alertLink.setAttribute('aria-label', `${alertas.length} alertas de stock. Ver alertas recientes`);
+    actualizarContadorAlertas(alertas);
     renderAlertas(alertas);
   } else {
+    actualizarContadorAlertas(null);
     renderAlertas(null);
-    const alertCount = document.getElementById('dashboard-alert-count');
-    if (alertCount) alertCount.hidden = true;
   }
 
   if (movimientosResult.status === 'fulfilled') {
@@ -257,6 +244,25 @@ async function cargarDashboard() {
   }
 }
 
+function actualizarContadorAlertas(alertas) {
+  const contador = document.getElementById('dashboard-alert-count');
+  const enlace = document.getElementById('dashboard-alerts-link');
+  if (!Array.isArray(alertas)) {
+    if (contador) {
+      contador.textContent = '';
+      contador.hidden = true;
+    }
+    if (enlace) enlace.setAttribute('aria-label', 'Ver alertas de stock');
+    return;
+  }
+
+  if (contador) {
+    contador.textContent = String(alertas.length);
+    contador.hidden = alertas.length === 0;
+  }
+  if (enlace) enlace.setAttribute('aria-label', `${alertas.length} alertas de stock. Ver alertas`);
+}
+
 function ventasEnDia(movimientos, fechaObjetivo) {
   const clave = claveDia(fechaObjetivo);
   return movimientos.reduce((total, movimiento) => {
@@ -270,8 +276,10 @@ function renderComparacionVentas(movimientos) {
   const contenedor = document.getElementById('stat-ventas-comparison');
   if (!contenedor) return;
 
-  const hoy = new Date();
-  const ayer = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 1);
+  const hoy = fechaActualLuany();
+  const ayer = new Date(Date.UTC(
+    hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate() - 1,
+  ));
   const ventasAyer = ventasEnDia(movimientos, ayer);
   contenedor.replaceChildren();
 
@@ -302,9 +310,11 @@ function renderVentasSieteDias(movimientos) {
   const grafico = document.getElementById('dashboard-sales-chart');
   if (!grafico) return;
 
-  const hoy = new Date();
+  const hoy = fechaActualLuany();
   const dias = Array.from({ length: 7 }, (_, indice) => {
-    const fecha = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() - 6 + indice);
+    const fecha = new Date(Date.UTC(
+      hoy.getUTCFullYear(), hoy.getUTCMonth(), hoy.getUTCDate() - 6 + indice,
+    ));
     return { fecha, clave: claveDia(fecha), total: 0 };
   });
   const porDia = new Map(dias.map((dia) => [dia.clave, dia]));
@@ -379,7 +389,7 @@ function renderAlertas(alertas) {
     return;
   }
 
-  alertas.slice(0, 6).forEach((alerta) => {
+  alertas.forEach((alerta) => {
     const fila = document.createElement('a');
     fila.className = 'dashboard-alert-row';
     fila.href = '/productos.html';
@@ -393,10 +403,14 @@ function renderAlertas(alertas) {
     nombre.className = 'dashboard-alert-name';
     nombre.textContent = alerta.nombre || 'Producto';
 
+    const categoria = document.createElement('span');
+    categoria.className = 'dashboard-alert-category';
+    categoria.textContent = alerta.categoria || 'Categoría no disponible';
+
     const stock = document.createElement('span');
     stock.className = 'dashboard-alert-stock';
     stock.textContent = `Stock: ${Number(alerta.stockActual) || 0} / Mínimo: ${Number(alerta.stockMinimo) || 0}`;
-    detalle.append(nombre, stock);
+    detalle.append(nombre, categoria, stock);
 
     const estado = document.createElement('span');
     const slugEstado = alerta.estado === 'AGOTADO' ? 'agotado' : 'bajo';
@@ -415,6 +429,38 @@ function renderAlertas(alertas) {
   });
 }
 
+function fechaInicioPeriodo(periodo, referencia = fechaActualLuany()) {
+  const inicio = new Date(referencia);
+  inicio.setUTCHours(0, 0, 0, 0);
+
+  if (periodo === '6m' || periodo === '1y') {
+    const dia = inicio.getUTCDate();
+    const meses = periodo === '6m' ? 6 : 12;
+    inicio.setUTCDate(1);
+    inicio.setUTCMonth(inicio.getUTCMonth() - meses);
+    const ultimoDia = new Date(Date.UTC(
+      inicio.getUTCFullYear(), inicio.getUTCMonth() + 1, 0,
+    )).getUTCDate();
+    inicio.setUTCDate(Math.min(dia, ultimoDia));
+    return inicio;
+  }
+
+  const dias = Number(periodo) || 30;
+  inicio.setUTCDate(inicio.getUTCDate() - dias + 1);
+  return inicio;
+}
+
+function filtrarVentasPeriodo(movimientos, periodo, referencia = fechaActualLuany()) {
+  const inicio = fechaInicioPeriodo(periodo, referencia);
+  const fin = new Date(referencia);
+  fin.setUTCHours(23, 59, 59, 999);
+  return movimientos.filter((movimiento) => {
+    if (movimiento.tipo !== 'VENTA') return false;
+    const fecha = fechaMovimiento(movimiento.fecha);
+    return Boolean(fecha && fecha >= inicio && fecha <= fin && movimiento.producto);
+  });
+}
+
 function renderGrafico(movimientos, periodo = '30') {
   const contenedor = document.getElementById('grafico-ventas');
   contenedor.replaceChildren();
@@ -424,19 +470,10 @@ function renderGrafico(movimientos, periodo = '30') {
     return;
   }
 
-  const dias = periodo === 'hoy' ? 1 : Number(periodo) || 30;
-  const inicio = new Date();
-  inicio.setHours(0, 0, 0, 0);
-  inicio.setDate(inicio.getDate() - dias + 1);
-  const fin = new Date();
-  fin.setHours(23, 59, 59, 999);
   const productos = new Map();
 
-  movimientos.forEach((movimiento) => {
-    if (movimiento.tipo !== 'VENTA') return;
-    const fecha = fechaMovimiento(movimiento.fecha);
+  filtrarVentasPeriodo(movimientos, periodo).forEach((movimiento) => {
     const producto = movimiento.producto;
-    if (!fecha || fecha < inicio || fecha > fin || !producto) return;
 
     const clave = producto.id ?? producto.nombre;
     if (clave == null) return;
