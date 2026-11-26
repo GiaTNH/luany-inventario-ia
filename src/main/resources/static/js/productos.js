@@ -10,10 +10,9 @@ let ordenProductos = { campo: null, direccion: 1 };
 
 // ---------- PESTAÑAS ----------
 
-function cambiarTab(nombre) {
-  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
-    const tabs = ['productos', 'categorias', 'proveedores'];
-    btn.classList.toggle('activo', tabs[i] === nombre);
+function cambiarTab(nombre, cargarDatos = true) {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.toggle('activo', btn.dataset.tab === nombre);
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('activo'));
   document.getElementById(`tab-${nombre}`).classList.add('activo');
@@ -27,24 +26,25 @@ function cambiarTab(nombre) {
   if (nombre === 'productos') history.replaceState(null, '', `${location.pathname}${location.search}`);
   else history.replaceState(null, '', `#${nombre}`);
 
-  if (nombre === 'categorias')  cargarCategorias();
-  if (nombre === 'proveedores') cargarProveedores();
+  marcarNavActivo();
+
+  if (cargarDatos && nombre === 'categorias') cargarCategorias();
 }
 
 // ---------- MODALES ----------
 
 function abrirModal(id) {
-  document.getElementById(id).classList.add('visible');
+  abrirModalAccesible(document.getElementById(id));
 }
 
 function cerrarModal(id) {
-  document.getElementById(id).classList.remove('visible');
+  cerrarModalAccesible(document.getElementById(id));
 }
 
 // Cierra modal al hacer clic en el overlay
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
   overlay.addEventListener('click', e => {
-    if (e.target === overlay) overlay.classList.remove('visible');
+    if (e.target === overlay) cerrarModal(overlay.id);
   });
 });
 
@@ -56,6 +56,23 @@ document.addEventListener('keydown', evento => {
   if (evento.key === 'Escape') cerrarMenuEntradaSalida();
 });
 
+document.addEventListener('click', evento => {
+  const botonProducto = evento.target.closest('[data-product-action]');
+  if (botonProducto) {
+    const { productAction, productId, productName, movementType } = botonProducto.dataset;
+    if (productAction === 'history') verHistorial(Number(productId), productName);
+    if (productAction === 'movement') abrirModalMovimiento(Number(productId), productName, movementType);
+    if (productAction === 'delete') confirmarEliminarProducto(Number(productId), productName);
+    return;
+  }
+
+  const botonCategoria = evento.target.closest('[data-category-action]');
+  if (!botonCategoria) return;
+  const { categoryAction, categoryId, categoryName } = botonCategoria.dataset;
+  if (categoryAction === 'edit') abrirModalCategoria(Number(categoryId), categoryName);
+  if (categoryAction === 'delete') confirmarEliminarCat(Number(categoryId), categoryName);
+});
+
 // ---------- UTILIDADES FORMULARIO ----------
 
 function mostrarErrForm(id, visible) {
@@ -65,22 +82,37 @@ function mostrarErrForm(id, visible) {
 
 function limpiarErrs(ids) { ids.forEach(id => mostrarErrForm(id, false)); }
 
+window.addEventListener('hashchange', () => {
+  const tab = location.hash.slice(1);
+  if (tab === 'categorias') cambiarTab(tab);
+  else cambiarTab('productos');
+});
+
 // ---------- CARGA INICIAL ----------
 
 async function cargarTodo() {
   try {
-    [todosProductos, todasCategorias, todosProveedores] = await Promise.all([
+    [todosProductos, todasCategorias] = await Promise.all([
       apiGet('/api/productos'),
       apiGet('/api/categorias'),
-      apiGet('/api/proveedores'),
     ]);
     renderTablaProductos(todosProductos);
     poblarFiltroCategoria();
   } catch (err) {
     mostrarToast(err.message, 'error');
     document.getElementById('tabla-productos-body').innerHTML =
-      `<tr><td colspan="9" style="text-align:center;color:var(--rojo);padding:24px;">${escapar(err.message)}</td></tr>`;
+      `<tr><td colspan="10" style="text-align:center;color:var(--rojo);padding:24px;">${escapar(err.message)}</td></tr>`;
+    return;
   }
+
+  try {
+    todosProveedores = await apiGet('/api/proveedores');
+    poblarSelectsCatalogos();
+    poblarFiltroProveedor();
+  } catch (err) {
+    mostrarToast(err.message, 'error');
+  }
+  aplicarFiltros();
 }
 
 function poblarFiltroCategoria() {
@@ -91,12 +123,24 @@ function poblarFiltroCategoria() {
   sel.value = actual;
 }
 
+function poblarFiltroProveedor() {
+  const select = document.getElementById('filtro-proveedor');
+  const actual = select.value;
+  select.innerHTML = '<option value="">Todos los proveedores</option>' +
+    todosProveedores
+      .slice()
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+      .map(proveedor => `<option value="${proveedor.id}">${escapar(proveedor.nombre)}</option>`)
+      .join('');
+  select.value = actual;
+}
+
 // ---------- TABLA PRODUCTOS ----------
 
 function renderTablaProductos(lista) {
   const tbody = document.getElementById('tabla-productos-body');
   if (!lista.length) {
-    tbody.innerHTML = `<tr><td colspan="9"><div class="productos-empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4M8 11h6"/></svg><p>No se encontraron productos con estos filtros.</p></div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10"><div class="productos-empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4M8 11h6"/></svg><p>No se encontraron productos con estos filtros.</p></div></td></tr>`;
     return;
   }
 
@@ -107,22 +151,23 @@ function renderTablaProductos(lista) {
     const iconoCategoria = iconoCategoriaSvg(p.categoria);
     const iconoPrenda = iconoPrendaSvg(p.nombre);
     return `<tr class="productos-card-row">
-      <td><div class="producto-table-name">
+      <td data-label="Producto"><div class="producto-table-name">
         <span class="producto-table-thumb">
           <span class="producto-thumb-fallback" aria-hidden="true">${iconoPrenda}</span>
           <img src="/img/productos/${encodeURIComponent(p.id)}.png" alt="" loading="lazy" onerror="this.hidden=true" />
         </span>
         <span class="producto-table-copy"><strong>${nombre}</strong></span>
       </div></td>
-      <td><span class="producto-category-tag ${categoriaClase}">${iconoCategoria}${escapar(p.categoria?.nombre || '—')}</span></td>
-      <td><span class="producto-provider-name">${escapar(p.proveedor?.nombre || '—')}</span></td>
-      <td class="producto-stock-current"><strong>${Number(p.stockActual) || 0}</strong></td>
-      <td class="producto-stock-muted">${Number(p.stockMinimo) || 0}</td>
-      <td class="producto-stock-muted">${Number(p.stockMaximo) || 0}</td>
-      <td>S/ ${Number(p.precio).toFixed(2)}</td>
-      <td><span class="producto-status producto-status-${estado.toLowerCase()}"><i></i>${estado}</span></td>
-      <td><div class="productos-row-actions">
-        <button type="button" class="productos-action-button productos-row-history" title="Ver movimientos" aria-label="Ver movimientos de ${nombre}" onclick="verHistorial(${p.id},'${nombre}')">
+      <td data-label="Código">${escapar(p.codigo || '—')}</td>
+      <td data-label="Categoría"><span class="producto-category-tag ${categoriaClase}">${iconoCategoria}${escapar(p.categoria?.nombre || '—')}</span></td>
+      <td data-label="Proveedor"><span class="producto-provider-name">${escapar(p.proveedor?.nombre || '—')}</span></td>
+      <td data-label="Stock actual" class="producto-stock-current"><strong>${Number(p.stockActual) || 0}</strong></td>
+      <td data-label="Stock mínimo" class="producto-stock-muted">${Number(p.stockMinimo) || 0}</td>
+      <td data-label="Stock máximo" class="producto-stock-muted">${Number(p.stockMaximo) || 0}</td>
+      <td data-label="Precio">S/ ${Number(p.precio).toFixed(2)}</td>
+      <td data-label="Estado"><span class="producto-status producto-status-${estado.toLowerCase()}"><i></i>${estado}</span></td>
+      <td data-label="Acciones"><div class="productos-row-actions">
+        <button type="button" class="productos-action-button productos-row-history" title="Ver movimientos" aria-label="Ver movimientos de ${nombre}" data-product-action="history" data-product-id="${p.id}" data-product-name="${nombre}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg>
         </button>
         <button type="button" class="productos-action-button productos-row-edit" title="Editar" aria-label="Editar ${nombre}" onclick="abrirModalProducto(${p.id})">
@@ -133,11 +178,11 @@ function renderTablaProductos(lista) {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>
           </button>
           <div class="productos-entry-menu-popover" role="menu">
-            <button type="button" role="menuitem" title="Registrar entrada" aria-label="Registrar entrada para ${nombre}" onclick="abrirModalMovimiento(${p.id},'${nombre}','ENTRADA')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15v4h16v-4M12 3v12m-5-5 5 5 5-5"/></svg>Registrar entrada</button>
-            <button type="button" role="menuitem" title="Registrar salida" aria-label="Registrar salida para ${nombre}" onclick="abrirModalMovimiento(${p.id},'${nombre}','SALIDA')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>Registrar salida</button>
+            <button type="button" role="menuitem" title="Registrar entrada" aria-label="Registrar entrada para ${nombre}" data-product-action="movement" data-product-id="${p.id}" data-product-name="${nombre}" data-movement-type="ENTRADA"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 15v4h16v-4M12 3v12m-5-5 5 5 5-5"/></svg>Registrar entrada</button>
+            <button type="button" role="menuitem" title="Registrar salida" aria-label="Registrar salida para ${nombre}" data-product-action="movement" data-product-id="${p.id}" data-product-name="${nombre}" data-movement-type="SALIDA"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5m-6 6 6-6 6 6"/></svg>Registrar salida</button>
           </div>
         </div>
-        <button type="button" class="productos-action-button productos-row-delete" title="Eliminar" aria-label="Eliminar ${nombre}" onclick="confirmarEliminarProducto(${p.id},'${nombre}')">
+        <button type="button" class="productos-action-button productos-row-delete" title="Eliminar" aria-label="Eliminar ${nombre}" data-product-action="delete" data-product-id="${p.id}" data-product-name="${nombre}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg>
         </button>
       </div></td>
@@ -251,18 +296,20 @@ function iconoPrendaSvg(nombre) {
 // ---------- FILTROS ----------
 
 function aplicarFiltros() {
-  const texto    = document.getElementById('buscador').value.toLowerCase();
+  const texto    = document.getElementById('buscador').value.trim().toLocaleLowerCase('es-PE');
   const catId    = document.getElementById('filtro-categoria').value;
   const estadoF  = document.getElementById('filtro-estado').value;
+  const proveedorId = document.getElementById('filtro-proveedor').value;
 
   const filtrados = todosProductos.filter(p => {
     const nombre = (p.nombre || '').toLocaleLowerCase('es-PE');
-    const categoria = (p.categoria?.nombre || '').toLocaleLowerCase('es-PE');
-    const coincideNombre = nombre.includes(texto);
+    const codigo = (p.codigo || '').toLocaleLowerCase('es-PE');
+    const coincideNombreOCodigo = nombre.includes(texto) || codigo.includes(texto);
     const coincideCat    = !catId || String(p.categoria?.id) === catId;
+    const coincideProveedor = !proveedorId || String(p.proveedor?.id) === proveedorId;
     const estado         = calcularEstado(p.stockActual, p.stockMinimo, p.stockMaximo);
     const coincideEstado = !estadoF || estado === estadoF;
-    return coincideNombre && coincideCat && coincideEstado;
+    return coincideNombreOCodigo && coincideCat && coincideEstado && coincideProveedor;
   });
 
   renderTablaProductos(aplicarOrdenProductos(filtrados));
@@ -271,6 +318,7 @@ function aplicarFiltros() {
 document.getElementById('buscador').addEventListener('input', aplicarFiltros);
 document.getElementById('filtro-categoria').addEventListener('change', aplicarFiltros);
 document.getElementById('filtro-estado').addEventListener('change', aplicarFiltros);
+document.getElementById('filtro-proveedor').addEventListener('change', aplicarFiltros);
 
 // ---------- MODAL PRODUCTO ----------
 
@@ -296,8 +344,12 @@ function abrirModalProducto(id = null) {
   document.getElementById('prod-id').value           = '';
   document.getElementById('prod-nombre').value       = '';
   document.getElementById('prod-categoria').value    = '';
+  document.getElementById('prod-codigo').value       = '';
+  document.getElementById('prod-codigo').placeholder = 'Se asignará al guardar';
   document.getElementById('prod-proveedor').value    = '';
   document.getElementById('prod-stock-actual').value = '';
+  document.getElementById('prod-stock-actual').disabled = false;
+  document.getElementById('prod-stock-actual-label').textContent = 'Stock inicial *';
   document.getElementById('prod-precio').value       = '';
   document.getElementById('prod-stock-min').value    = '';
   document.getElementById('prod-stock-max').value    = '';
@@ -311,8 +363,12 @@ function abrirModalProducto(id = null) {
       document.getElementById('prod-id').value           = p.id;
       document.getElementById('prod-nombre').value       = p.nombre;
       document.getElementById('prod-categoria').value    = p.categoria?.id || '';
+      document.getElementById('prod-codigo').value       = p.codigo || '';
+      document.getElementById('prod-codigo').placeholder = '';
       document.getElementById('prod-proveedor').value    = p.proveedor?.id || '';
       document.getElementById('prod-stock-actual').value = p.stockActual;
+      document.getElementById('prod-stock-actual').disabled = true;
+      document.getElementById('prod-stock-actual-label').textContent = 'Stock actual (solo lectura)';
       document.getElementById('prod-precio').value       = p.precio;
       document.getElementById('prod-stock-min').value    = p.stockMinimo;
       document.getElementById('prod-stock-max').value    = p.stockMaximo;
@@ -330,6 +386,7 @@ async function guardarProducto() {
 
   const nombre      = document.getElementById('prod-nombre').value.trim();
   const categoriaId = Number(document.getElementById('prod-categoria').value);
+  const codigo      = document.getElementById('prod-codigo').value.trim();
   const proveedorId = Number(document.getElementById('prod-proveedor').value);
   const stockActual = Number(document.getElementById('prod-stock-actual').value);
   const precio      = Number(document.getElementById('prod-precio').value);
@@ -341,13 +398,13 @@ async function guardarProducto() {
   if (!nombre)                          { mostrarErrForm('err-prod-nombre', true);       valido = false; }
   if (!categoriaId)                     { mostrarErrForm('err-prod-categoria', true);    valido = false; }
   if (!proveedorId)                     { mostrarErrForm('err-prod-proveedor', true);    valido = false; }
-  if (isNaN(stockActual) || stockActual < 0) { mostrarErrForm('err-prod-stock-actual', true); valido = false; }
+  if (!id && (isNaN(stockActual) || stockActual < 0)) { mostrarErrForm('err-prod-stock-actual', true); valido = false; }
   if (isNaN(precio) || precio < 0)      { mostrarErrForm('err-prod-precio', true);       valido = false; }
   if (isNaN(stockMinimo) || stockMinimo < 0) { mostrarErrForm('err-prod-stock-min', true); valido = false; }
   if (isNaN(stockMaximo) || stockMaximo < stockMinimo) { mostrarErrForm('err-prod-stock-max', true); valido = false; }
   if (!valido) return;
 
-  const cuerpo = { nombre, categoriaId, proveedorId, stockActual, stockMinimo, stockMaximo, precio };
+  const cuerpo = { nombre, categoriaId, proveedorId, codigo, stockMinimo, stockMaximo, precio };
   const btn = document.getElementById('btn-guardar-producto');
   btn.disabled = true;
 
@@ -356,7 +413,7 @@ async function guardarProducto() {
       await apiPut(`/api/productos/${id}`, cuerpo);
       mostrarToast('Producto actualizado correctamente.', 'exito');
     } else {
-      await apiPost('/api/productos', cuerpo);
+      await apiPost('/api/productos', { ...cuerpo, stockActual });
       mostrarToast('Producto creado correctamente.', 'exito');
     }
     cerrarModal('modal-producto');
@@ -372,7 +429,7 @@ async function guardarProducto() {
 
 function confirmarEliminarProducto(id, nombre) {
   document.getElementById('confirmar-mensaje').textContent =
-    `¿Eliminar el producto "${nombre}"? Esta acción no se puede deshacer.`;
+    `¿Retirar "${nombre}" del catálogo? Se conservarán sus movimientos y no podrá tener stock disponible.`;
   const btnOk = document.getElementById('btn-confirmar-ok');
   btnOk.onclick = () => eliminarProducto(id);
   abrirModal('modal-confirmar');
@@ -383,7 +440,7 @@ async function eliminarProducto(id) {
   btn.disabled = true;
   try {
     await apiDelete(`/api/productos/${id}`);
-    mostrarToast('Producto eliminado.', 'exito');
+    mostrarToast('Producto retirado del catálogo; su historial se conservó.', 'exito');
     cerrarModal('modal-confirmar');
     await cargarTodo();
   } catch (err) {
@@ -457,7 +514,9 @@ async function verHistorial(productoId, nombre) {
       return;
     }
     tbody.innerHTML = movs.map(m => {
-      const colorTipo = m.tipo === 'ENTRADA' ? 'badge-normal' : m.tipo === 'VENTA' ? 'badge-bajo' : 'badge-exceso';
+      const colorTipo = m.tipo === 'ENTRADA' ? 'badge-normal'
+        : m.tipo === 'VENTA' ? 'badge-bajo'
+          : m.tipo === 'CREACION' || m.tipo === 'EDICION' ? 'badge-exceso' : 'badge-exceso';
       return `<tr>
         <td>${escapar(normalizarFecha(m.fecha))}</td>
         <td><span class="badge ${colorTipo}">${escapar(m.tipo)}</span></td>
@@ -493,10 +552,10 @@ function renderTablaCategorias() {
     <td><strong class="productos-entity-name">${escapar(c.nombre)}</strong></td>
     <td>
       <div class="productos-row-actions productos-entity-actions">
-        <button type="button" class="productos-action-button productos-row-edit" title="Editar categoría" aria-label="Editar categoría ${escapar(c.nombre)}" onclick="abrirModalCategoria(${c.id},'${escapar(c.nombre)}')">
+        <button type="button" class="productos-action-button productos-row-edit" title="Editar categoría" aria-label="Editar categoría ${escapar(c.nombre)}" data-category-action="edit" data-category-id="${c.id}" data-category-name="${escapar(c.nombre)}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z"/></svg>
         </button>
-        <button type="button" class="productos-action-button productos-row-delete" title="Eliminar categoría" aria-label="Eliminar categoría ${escapar(c.nombre)}" onclick="confirmarEliminarCat(${c.id},'${escapar(c.nombre)}')">
+        <button type="button" class="productos-action-button productos-row-delete" title="Eliminar categoría" aria-label="Eliminar categoría ${escapar(c.nombre)}" data-category-action="delete" data-category-id="${c.id}" data-category-name="${escapar(c.nombre)}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg>
         </button>
       </div>
@@ -555,92 +614,7 @@ async function eliminarCategoria(id) {
   }
 }
 
-// ---------- PROVEEDORES ----------
-
-async function cargarProveedores() {
-  try {
-    todosProveedores = await apiGet('/api/proveedores');
-    renderTablaProveedores();
-  } catch (err) {
-    mostrarToast(err.message, 'error');
-  }
-}
-
-function renderTablaProveedores() {
-  const tbody = document.getElementById('tabla-proveedores-body');
-  if (!todosProveedores.length) {
-    tbody.innerHTML = `<tr><td colspan="4"><div class="estado-vacio"><p>Sin proveedores.</p></div></td></tr>`;
-    return;
-  }
-  tbody.innerHTML = todosProveedores.map(p => `<tr class="productos-card-row">
-    <td><span class="productos-entity-id">${p.id}</span></td>
-    <td><strong class="productos-entity-name">${escapar(p.nombre)}</strong></td>
-    <td><span class="productos-entity-phone">${escapar(p.telefono || '—')}</span></td>
-    <td>
-      <div class="productos-row-actions productos-entity-actions">
-        <button type="button" class="productos-action-button productos-row-edit" title="Editar proveedor" aria-label="Editar proveedor ${escapar(p.nombre)}" onclick="abrirModalProveedor(${p.id},'${escapar(p.nombre)}','${escapar(p.telefono||'')}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z"/></svg>
-        </button>
-        <button type="button" class="productos-action-button productos-row-delete" title="Eliminar proveedor" aria-label="Eliminar proveedor ${escapar(p.nombre)}" onclick="confirmarEliminarProv(${p.id},'${escapar(p.nombre)}')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6m4-6v6M6 7l1 14h10l1-14M9 7V4h6v3"/></svg>
-        </button>
-      </div>
-    </td>
-  </tr>`).join('');
-}
-
-function abrirModalProveedor(id = null, nombre = '', telefono = '') {
-  document.getElementById('prov-id').value       = id || '';
-  document.getElementById('prov-nombre').value   = nombre;
-  document.getElementById('prov-telefono').value = telefono;
-  document.getElementById('modal-prov-titulo').textContent = id ? 'Editar proveedor' : 'Nuevo proveedor';
-  limpiarErrs(['err-prov-nombre']);
-  abrirModal('modal-proveedor');
-}
-
-async function guardarProveedor() {
-  const nombre   = document.getElementById('prov-nombre').value.trim();
-  const telefono = document.getElementById('prov-telefono').value.trim();
-  const id       = document.getElementById('prov-id').value;
-  if (!nombre) { mostrarErrForm('err-prov-nombre', true); return; }
-
-  try {
-    if (id) {
-      await apiPut(`/api/proveedores/${id}`, { nombre, telefono });
-      mostrarToast('Proveedor actualizado.', 'exito');
-    } else {
-      await apiPost('/api/proveedores', { nombre, telefono });
-      mostrarToast('Proveedor creado.', 'exito');
-    }
-    cerrarModal('modal-proveedor');
-    await cargarProveedores();
-  } catch (err) {
-    mostrarToast(err.message, 'error');
-  }
-}
-
-function confirmarEliminarProv(id, nombre) {
-  document.getElementById('confirmar-mensaje').textContent = `¿Eliminar el proveedor "${nombre}"?`;
-  document.getElementById('btn-confirmar-ok').onclick = () => eliminarProveedor(id);
-  abrirModal('modal-confirmar');
-}
-
-async function eliminarProveedor(id) {
-  const btn = document.getElementById('btn-confirmar-ok');
-  btn.disabled = true;
-  try {
-    await apiDelete(`/api/proveedores/${id}`);
-    mostrarToast('Proveedor eliminado.', 'exito');
-    cerrarModal('modal-confirmar');
-    await cargarProveedores();
-  } catch (err) {
-    mostrarToast(err.message, 'error');
-  } finally {
-    btn.disabled = false;
-  }
-}
-
 // ---------- INICIO ----------
 const tabInicial = location.hash.slice(1);
-if (tabInicial === 'categorias' || tabInicial === 'proveedores') cambiarTab(tabInicial);
+if (tabInicial === 'categorias') cambiarTab(tabInicial, false);
 cargarTodo();

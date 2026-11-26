@@ -1,0 +1,219 @@
+package com.luany.inventory.service;
+
+import com.luany.inventory.model.ActualizarUsuarioRequest;
+import com.luany.inventory.model.CambiarRolRequest;
+import com.luany.inventory.model.Usuario;
+import com.luany.inventory.model.UsuarioGestionResponse;
+import com.luany.inventory.model.ResultadoNotificacion;
+import com.luany.inventory.repository.UsuarioRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.session.SessionRegistry;
+import org.springframework.security.core.session.SessionInformation;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.util.List;
+import java.util.Locale;
+
+@Service
+public class UsuarioGestionService {
+
+    private final UsuarioRepository usuarioRepository;
+    private final SessionRegistry sessionRegistry;
+    private final CorreoService correoService;
+    private final NotificacionTrasCommit notificacionTrasCommit;
+    private final SeguridadService seguridadService;
+
+    @Autowired
+    public UsuarioGestionService(
+            UsuarioRepository usuarioRepository,
+            SessionRegistry sessionRegistry,
+            CorreoService correoService,
+            NotificacionTrasCommit notificacionTrasCommit,
+            SeguridadService seguridadService) {
+        this.usuarioRepository = usuarioRepository;
+        this.sessionRegistry = sessionRegistry;
+        this.correoService = correoService;
+        this.notificacionTrasCommit = notificacionTrasCommit;
+        this.seguridadService = seguridadService;
+    }
+
+    public UsuarioGestionService(
+            UsuarioRepository usuarioRepository,
+            SessionRegistry sessionRegistry,
+            CorreoService correoService,
+            NotificacionTrasCommit notificacionTrasCommit) {
+        this(usuarioRepository, sessionRegistry, correoService, notificacionTrasCommit, null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UsuarioGestionResponse> listar() {
+        return usuarioRepository.findAll(org.springframework.data.domain.Sort.by(
+                        org.springframework.data.domain.Sort.Order.asc("apellido").ignoreCase(),
+                        org.springframework.data.domain.Sort.Order.asc("nombre").ignoreCase()))
+                .stream()
+                .map(this::aRespuesta)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<UsuarioGestionResponse> listarParaAsistente(int limite) {
+        return usuarioRepository.findAll(PageRequest.of(
+                        0, limite,
+                        org.springframework.data.domain.Sort.by(
+                                org.springframework.data.domain.Sort.Order.asc("apellido").ignoreCase(),
+                                org.springframework.data.domain.Sort.Order.asc("nombre").ignoreCase())))
+                .stream()
+                .map(this::aRespuesta)
+                .toList();
+    }
+
+    @Transactional
+    public UsuarioGestionResponse cambiarRol(Long id, CambiarRolRequest request, String emailAdministrador) {
+        List<Usuario> administradores = usuarioRepository.buscarAdministradoresParaActualizar();
+        Usuario usuario = usuarioRepository.buscarPorIdParaActualizar(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "El usuario no existe"));
+
+        String nuevoRol = request.getRol();
+        if (usuario.getEmail().equalsIgnoreCase(emailAdministrador) && !"ADMIN".equals(nuevoRol)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "No puedes quitarte tu propio rol de administrador");
+        }
+
+        long administradoresActivos = administradores.stream()
+                .filter(admin -> "ACTIVO".equalsIgnoreCase(admin.getEstado()))
+                .count();
+        if ("ADMIN".equals(usuario.getRol())
+                && "ACTIVO".equalsIgnoreCase(usuario.getEstado())
+                && !"ADMIN".equals(nuevoRol)
+                && administradoresActivos <= 1) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "Debe permanecer al menos un administrador activo");
+        }
+
+        boolean rolCambio = !usuario.getRol().equals(nuevoRol);
+        usuario.setRol(nuevoRol);
+        Usuario guardado = usuarioRepository.saveAndFlush(usuario);
+        if (rolCambio) {
+            expirarSesiones(guardado.getEmail());
+        }
+        auditoriaRol(guardado, rolCambio, nuevoRol, emailAdministrador);
+        return aRespuesta(guardado);
+    }
+
+    @Transactional
+    public ResultadoNotificacion<UsuarioGestionResponse> actualizar(
+            Long id, ActualizarUsuarioRequest request, String emailAdministrador) {
+        List<Usuario> administradores = usuarioRepository.buscarAdministradoresParaActualizar();
+        Usuario usuario = usuarioRepository.buscarPorIdParaActualizar(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "El usuario no existe"));
+
+        String nuevoRol = request.getRol();
+        String nuevoEstado = request.getEstado();
+        if (usuario.getEmail().equalsIgnoreCase(emailAdministrador)
+                && !"ADMIN".equals(nuevoRol)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "No puedes quitarte tu propio rol de administrador");
+        }
+        if (usuario.getEmail().equalsIgnoreCase(emailAdministrador)
+                && "ACTIVO".equalsIgnoreCase(usuario.getEstado())
+                && "INACTIVO".equals(nuevoEstado)) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "No puedes desactivar tu propia cuenta de administrador");
+        }
+
+        boolean dejaDeSerAdministradorActivo = "ADMIN".equals(usuario.getRol())
+                && "ACTIVO".equalsIgnoreCase(usuario.getEstado())
+                && (!"ADMIN".equals(nuevoRol) || !"ACTIVO".equals(nuevoEstado));
+        long administradoresActivos = administradores.stream()
+                .filter(admin -> "ACTIVO".equalsIgnoreCase(admin.getEstado()))
+                .count();
+        if (dejaDeSerAdministradorActivo && administradoresActivos <= 1) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT, "Debe permanecer al menos un administrador activo");
+        }
+
+        String emailAnterior = usuario.getEmail();
+        String nuevoEmail = request.getEmail().trim().toLowerCase(Locale.ROOT);
+        usuarioRepository.buscarPorEmail(nuevoEmail)
+                .filter(existente -> !existente.getId().equals(id))
+                .ifPresent(existente -> {
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT, "Ya existe un usuario con ese correo");
+                });
+
+        boolean cambiaRol = !usuario.getRol().equals(nuevoRol);
+        boolean seDesactiva = "ACTIVO".equalsIgnoreCase(usuario.getEstado())
+                && "INACTIVO".equals(nuevoEstado);
+        boolean seReactiva = "INACTIVO".equalsIgnoreCase(usuario.getEstado())
+                && "ACTIVO".equals(nuevoEstado);
+        usuario.setNombre(request.getNombre().trim());
+        usuario.setApellido(request.getApellido() == null || request.getApellido().isBlank()
+                ? null : request.getApellido().trim());
+        usuario.setEmail(nuevoEmail);
+        usuario.setRol(nuevoRol);
+        usuario.setEstado(nuevoEstado);
+
+        Usuario guardado = usuarioRepository.saveAndFlush(usuario);
+        boolean cambiaCorreo = !emailAnterior.equalsIgnoreCase(nuevoEmail);
+        ResultadoNotificacion<UsuarioGestionResponse> resultado =
+                new ResultadoNotificacion<>(aRespuesta(guardado), cambiaCorreo);
+        if (cambiaCorreo) {
+            notificacionTrasCommit.registrar(
+                    "cambio de correo",
+                    () -> correoService.enviarNotificacionCambioCorreo(nuevoEmail, guardado.getNombre()),
+                    resultado::marcarNotificacionAceptada);
+        }
+        if (cambiaRol || seDesactiva || !emailAnterior.equalsIgnoreCase(nuevoEmail)) {
+            expirarSesiones(emailAnterior);
+        }
+        if (seguridadService != null) {
+            if (cambiaRol) {
+                seguridadService.registrarAuditoria(guardado.getEmail(), "CAMBIO_ROL",
+                        "EXITOSO", null,
+                        "Rol cambiado por " + emailAdministrador);
+            }
+            if (seDesactiva) {
+                seguridadService.registrarAuditoria(guardado.getEmail(), "DESACTIVACION_USUARIO",
+                        "EXITOSO", null,
+                        "Usuario deshabilitado por " + emailAdministrador);
+            }
+            if (seReactiva) {
+                seguridadService.registrarAuditoria(guardado.getEmail(), "REACTIVACION_USUARIO",
+                        "EXITOSO", null,
+                        "Usuario reactivado por " + emailAdministrador);
+            }
+        }
+        return resultado;
+    }
+
+    private void auditoriaRol(
+            Usuario usuario, boolean cambio, String nuevoRol, String administrador) {
+        if (seguridadService != null && cambio) {
+            seguridadService.registrarAuditoria(usuario.getEmail(), "CAMBIO_ROL",
+                    "EXITOSO", null,
+                    "Rol cambiado a " + nuevoRol + " por " + administrador);
+        }
+    }
+
+    private void expirarSesiones(String email) {
+        sessionRegistry.getAllSessions(email, false).forEach(SessionInformation::expireNow);
+    }
+
+    private UsuarioGestionResponse aRespuesta(Usuario usuario) {
+        return new UsuarioGestionResponse(
+                usuario.getId(),
+                usuario.getNombre(),
+                usuario.getApellido(),
+                usuario.getEmail(),
+                usuario.getNombreUsuario(),
+                usuario.getRol(),
+                usuario.getEstado(),
+                usuario.isDebeCambiarPassword(),
+                usuario.isBloqueadoManual(),
+                usuario.getBloqueadoHasta());
+    }
+}
